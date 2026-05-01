@@ -1,0 +1,23 @@
+machine:
+  sysctls:
+      net.netfilter.nf_conntrack_max: "262144"
+  network:
+    interfaces:
+      - interface: eth0
+        vip:
+          ip: ${vip}
+  time:
+    servers:
+      - ntp0.ntp-servers.net
+      - ntp1.ntp-servers.net
+      - ntp2.ntp-servers.net
+  kernel:
+    modules:
+      - name: br_netfilter
+cluster:
+  network:
+    cni:
+      name: flannel
+  allowSchedulingOnControlPlanes: true
+  externalCloudProvider:
+    enabled: false

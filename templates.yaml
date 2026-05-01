@@ -1,0 +1,82 @@
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: ProxmoxMachineTemplate
+metadata:
+  name: control-plane
+  namespace: default
+spec:
+  template:
+    spec:
+      disks:
+        bootVolume:
+          disk: scsi0
+          sizeGb: 20
+      format: qcow2
+      full: true
+      memoryMiB: 4096
+      network:
+        default:
+          bridge: vmbr0
+          model: virtio
+          vlan: 30
+      numCores: 4
+      numSockets: 1
+      sourceNode: pve
+      templateID: 1006
+      checks:
+        skipCloudInitStatus: true
+      metadataSettings:
+        providerIDInjection: true
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: ProxmoxMachineTemplate
+metadata:
+  name: worker
+  namespace: default
+spec:
+  template:
+    spec:
+      disks:
+        bootVolume:
+          disk: scsi0
+          sizeGb: 20
+      format: qcow2
+      full: true
+      memoryMiB: 4096
+      network:
+        default:
+          bridge: vmbr0
+          model: virtio
+          vlan: 30
+      numCores: 4
+      numSockets: 1
+      sourceNode: pve
+      templateID: 1006
+      checks:
+        skipCloudInitStatus: true
+      metadataSettings:
+        providerIDInjection: true
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1alpha3
+kind: TalosConfigTemplate
+metadata:
+  name: worker
+spec:
+  template:
+    spec:
+      generateType: worker
+      talosVersion: v1.12.7
+      strategicPatches:
+        - |
+          machine:
+            features:
+              kubePrism:
+                enabled: true
+                port: 7445
+            kubelet:
+              extraArgs:
+                cloud-provider: external
+                rotate-server-certificates: "true"
+            install:
+              disk: /dev/sda
+              image: ghcr.io/siderolabs/installer:v1.12.7

@@ -1,0 +1,201 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: test-cluster
+  namespace: default
+spec:
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
+    kind: TalosControlPlane
+    name: capi-test-cp
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+    kind: ProxmoxCluster
+    name: pve-test-cluster
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: ProxmoxCluster
+metadata:
+  name: pve-test-cluster
+  namespace: default
+spec:
+  schedulerHints:
+    memoryAdjustment: 0
+  allowedNodes:
+    - pve
+  controlPlaneEndpoint:
+    host: 10.10.30.200
+    port: 6443
+  dnsServers:
+    - 10.10.30.1
+  ipv4Config:
+    addresses:
+      - 10.10.30.201-10.10.30.254
+    gateway: 10.10.30.1
+    prefix: 24
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: ProxmoxMachineTemplate
+metadata:
+  name: capi-test-cp
+  namespace: default
+spec:
+  template:
+    spec:
+      disks:
+        bootVolume:
+          disk: scsi0
+          sizeGb: 20
+      format: qcow2
+      full: true
+      memoryMiB: 4096
+      network:
+        default:
+          bridge: vmbr0
+          model: virtio
+          vlan: 30
+      numCores: 4
+      numSockets: 1
+      sourceNode: pve
+      templateID: 1006
+      checks:
+        skipCloudInitStatus: true
+      metadataSettings:
+        providerIDInjection: true
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: ProxmoxMachineTemplate
+metadata:
+  name: capi-test-worker
+  namespace: default
+spec:
+  template:
+    spec:
+      disks:
+        bootVolume:
+          disk: scsi0
+          sizeGb: 20
+      format: qcow2
+      full: true
+      memoryMiB: 4096
+      network:
+        default:
+          bridge: vmbr0
+          model: virtio
+          vlan: 30
+      numCores: 4
+      numSockets: 1
+      sourceNode: pve
+      templateID: 1006
+      checks:
+        skipCloudInitStatus: true
+      metadataSettings:
+        providerIDInjection: true
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
+kind: TalosControlPlane
+metadata:
+  name: capi-test-cp
+spec:
+  version: v1.33.0
+  replicas: 3
+  infrastructureTemplate:
+    kind: ProxmoxMachineTemplate
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+    name: capi-test-cp
+    namespace: default
+  controlPlaneConfig:
+    controlplane:
+      generateType: controlplane
+      strategicPatches:
+        - |
+          machine:
+            sysctls:
+              net.netfilter.nf_conntrack_max: "262144"
+            kernel:
+              modules:
+                - name: br_netfilter
+            features:
+              kubePrism:
+                enabled: true
+                port: 7445
+              kubernetesTalosAPIAccess:
+                enabled: true
+                allowedRoles:
+                  - os:reader
+                allowedKubernetesNamespaces:
+                  - kube-system
+            kubelet:
+              extraArgs:
+                rotate-server-certificates: "true"
+                cloud-provider: external
+            install:
+              disk: /dev/sda
+              image: ghcr.io/siderolabs/installer:v1.12.7
+              extraKernelArgs:
+                - net.ifnames=0
+            network:
+              interfaces:
+                - interface: eth0
+                  dhcp: false
+                  vip:
+                    ip: 10.10.30.200
+          cluster:
+            network:
+              cni:
+                name: none
+            proxy:
+              disabled: true
+            externalCloudProvider:
+              enabled: true
+              manifests:
+                - https://raw.githubusercontent.com/siderolabs/talos-cloud-controller-manager/main/docs/deploy/cloud-controller-manager.yml
+                - https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/main/deploy/standalone-install.yaml
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1alpha3
+kind: TalosConfigTemplate
+metadata:
+  name: capi-test-worker-template
+spec:
+  template:
+    spec:
+      generateType: worker
+      talosVersion: v1.12.7
+      strategicPatches:
+        - |
+          machine:
+            features:
+              kubePrism:
+                enabled: true
+                port: 7445
+            kubelet:
+              extraArgs:
+                cloud-provider: external
+                rotate-server-certificates: "true"
+            install:
+              disk: /dev/sda
+              image: ghcr.io/siderolabs/installer:v1.12.7
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: capi-test-worker
+  namespace: default
+spec:
+  clusterName: test-cluster
+  replicas: 3
+  selector:
+    matchLabels: null
+  template:
+    spec:
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1alpha3
+          kind: TalosConfigTemplate
+          name: capi-test-worker-template
+      clusterName: test-cluster
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+        kind: ProxmoxMachineTemplate
+        name: capi-test-worker
+      version: v1.33.0
