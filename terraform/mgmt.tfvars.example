@@ -1,0 +1,24 @@
+pve = {
+  "endpoint"          = ""
+  "api_token"         = ""
+  "username"          = ""
+  "private_key"       = "~/.ssh/id_rsa"
+  "node_name"         = ""
+  "name_prefix"       = ""
+  "vm_id"             = 1000
+  "template_vm_id"    = 1007
+  "storage_disks"     = ""
+  "storage_cloudinit" = ""
+  "cp_mem"            = 8192
+  "dns_domain"        = ""
+  "dns_server"        = ""
+  "vlan_id"           = ""
+  "gateway"           = ""
+}
+
+talos = {
+  "cluster_name" = "mgmt"
+  "cp_ip"        = ""
+  "vip"          = ""
+  "version"      = "1.13.0"
+}
