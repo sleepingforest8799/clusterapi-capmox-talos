@@ -1,6 +1,10 @@
 ipam:
   mode: kubernetes
 kubeProxyReplacement: true
+externalIPs:
+  enabled: true
+l2announcements:
+  enabled: true
 securityContext:
   capabilities:
     ciliumAgent:

@@ -1,51 +1,6 @@
 # ClusterAPI - CAPMOX + Talos
 
-## Terraform values
-mgmt.config
-```text
-bucket     = "mgmt-cluster-api" 
-key        = "terraform.tfstate"
-region     = "us-east-1"
-endpoints  = {
-    s3 = "http://s3.home.local:9000"
-}
-access_key=""
-secret_key=""
-```
-
-mgmt.tfvars
-```terraform
-pve = {
-  "endpoint"          = ""
-  "api_token"         = ""
-  "username"          = ""
-  "private_key"       = ""
-  "node_name"         = ""
-  "name_prefix"       = ""
-  "vm_id"             = 100
-  "storage_disks"     = ""
-  "storage_cloudinit" = ""
-  "dns_domain"        = ""
-  "dns_server"        = ""
-  "vlan_id"           = ""
-  "cidr"              = ""
-  "gateway"           = ""
-  "cp_mem"            = 4096
-}
-
-talos = {
-  "version"      = "1.12.7"
-  "cp_count"     = 1
-  "environment"  = "mgmt"
-  "cluster_name" = "mgmt"
-
-  "cp_octet"     = 10 # last octet in cidr
-  "endpoint"     = ""
-  "vip"          = ""
-}
-```
-
-## Deploy management cluster
+## Create Talos template and management cluster
 ```shell
 cd terraform
 terraform init -backend-config=mgmt.config
@@ -53,9 +8,13 @@ terraform apply -var-file=mgmt.tfvars
 terraform output -raw kubeconfig > mgmt
 ```
 
-## Create user/token, VM Talos template
+## Create user/token
 ```shell
-ssh root@proxmox-ip 'bash -s' < init.sh
+pveum user add capmox@pve
+pveum user token add capmox@pve capi --privsep 1
+pveum role add Terraform -privs "Realm.AllocateUser, VM.PowerMgmt, VM.GuestAgent.Unrestricted, Sys.Console, Sys.Audit, Sys.AccessNetwork, VM.Config.Cloudinit, VM.Replicate, Pool.Allocate, SDN.Audit, Realm.Allocate, SDN.Use, Mapping.Modify, VM.Config.Memory, VM.GuestAgent.FileSystemMgmt, VM.Allocate, SDN.Allocate, VM.Console, VM.Clone, VM.Backup, Datastore.AllocateTemplate, VM.Snapshot, VM.Config.Network, Sys.Incoming, Sys.Modify, VM.Snapshot.Rollback, VM.Config.Disk, Datastore.Allocate, VM.Config.CPU, VM.Config.CDROM, Group.Allocate, Datastore.Audit, VM.Migrate, VM.GuestAgent.FileWrite, Mapping.Use, Datastore.AllocateSpace, Sys.Syslog, VM.Config.Options, Pool.Audit, User.Modify, VM.Config.HWType, VM.Audit, Sys.PowerMgmt, VM.GuestAgent.Audit, Mapping.Audit, VM.GuestAgent.FileRead, Permissions.Modify"
+pveum aclmod / --users capmox@pve --roles Terraform
+pveum aclmod / --tokens "capmox@pve!capi" --roles Terraform
 ```
 
 ## ~/.cluster-api/clusterctl.yaml
